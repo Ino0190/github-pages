@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps 位置記録アプリ</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        /* タブ切り替え用スタイル */
+        .tab-container {
+            width: 100%;
+            position: relative;
+        }
+        .tab-buttons {
+            display: flex;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab-button {
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        .tab-button:hover {
+            background-color: #ddd;
+        }
+        .tab-button.active {
+            background-color: #fff;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .tab-content {
+            display: none;
+            padding: 15px;
+            animation: fadeEffect 1s;
+        }
+        @keyframes fadeEffect {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+        
+        /* マップタブのスタイル */
+        #map {
+            width: 100%;
+            height: 400px;
+            transition: transform 0.5s ease;
+        }
+        .controls {
+            padding: 10px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .person-a { background-color: #4CAF50; color: white; }
+        .person-b { background-color: #2196F3; color: white; }
+        .person-c { background-color: #F44336; color: white; }
+        .utility-btn {
+            background-color: #555;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #status {
+            padding: 8px;
+            margin: 8px 0;
+            text-align: center;
+            border-radius: 4px;
+        }
+        
+        /* 設定タブのスタイル */
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .name-setup {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .name-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .name-input label {
+            width: 80px;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        .name-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .color-box {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            border-radius: 4px;
+        }
+        .save-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        
+        /* ホール選択のスタイル */
+        .course-selector {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        .hole-selector {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .hole-selector label {
+            font-weight: bold;
+            width: 120px;
+            margin-right: 15px;
+        }
+        .hole-selector select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            flex: 1;
+            max-width: 300px;
+        }
+        .hole-info {
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 4px;
+            text-align: center;
+        }
+        #course-display {
+            color: #2196F3;
+        }
+        #hole-number-display {
+            color: #4CAF50;
+        }
+        
+        /* Google Maps Pegmanのスタイル強調 */
+        .gmnoprint:has(div[class*="streetview"]) {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <!-- タブボタン -->
+    <div class="tab-buttons">
+        <button class="tab-button active" onclick="openTab('map-tab')">マップ・位置記録</button>
+        <button class="tab-button" onclick="openTab('settings-tab')">名前設定</button>
+    </div>
+
+    <!-- マップタブ -->
+    <div id="map-tab" class="tab-content" style="display: block;">
+        <div id="map"></div>
+        <div class="controls">
+            <div class="btn-group">
+                <button id="btn-a" class="person-a" onclick="selectPerson('a')">Aさん</button>
+                <button id="btn-b" class="person-b" onclick="selectPerson('b')">Bさん</button>
+                <button id="btn-c" class="person-c" onclick="selectPerson('c')">Cさん</button>
+            </div>
+            <div class="btn-group">
+                <!-- Tee位置ボタンを追加 -->
+                <button class="utility-btn" style="background-color: #795548; font-weight: bold;" onclick="setTeeMode()">Tee位置</button>
+                <button class="utility-btn" style="background-color: #9C27B0; font-weight: bold;" onclick="setCupMode()">カップ座標</button>
+                <button class="utility-btn" style="background-color: #FF9800; font-weight: bold;" onclick="recordCupIn()">カップイン</button>
+                <button class="utility-btn" onclick="goToCurrentLocation()">現在地</button>
+                <button class="utility-btn" onclick="exportCSV()">CSVエクスポート</button>
+                <button class="utility-btn" onclick="clearMarkers()">全てクリア</button>
+                <button class="utility-btn" onclick="toggleSatelliteView()">航空写真表示</button>
+                <button class="utility-btn" onclick="zoomInView()">拡大表示</button>
+                <button class="utility-btn" onclick="resetMapView()">標準表示</button>
+            </div>
+            <div id="status">位置を記録するには人物を選んでマップをタップしてください</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>名前</th>
+                        <th>No.</th>
+                        <th>緯度</th>
+                        <th>経度</th>
+                        <th>時刻</th>
+                        <th>打数</th>
+                    </tr>
+                </thead>
+                <tbody id="location-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 設定タブ -->
+    <div id="settings-tab" class="tab-content">
+        <div class="settings-container">
+            <h2>名前設定とホール選択</h2>
+            
+            <!-- ホール選択セクション -->
+            <div class="name-setup">
+                <h3>現在のホール選択</h3>
+                <div class="course-selector">
+                    <div class="hole-selector">
+                        <label for="hole-select">現在のホール:</label>
+                        <select id="hole-select" onchange="updateCurrentHole()">
+                            <optgroup label="OUTコース">
+                                <option value="1">1番ホール</option>
+                                <option value="2">2番ホール</option>
+                                <option value="3">3番ホール</option>
+                                <option value="4">4番ホール</option>
+                                <option value="5">5番ホール</option>
+                                <option value="6">6番ホール</option>
+                                <option value="7">7番ホール</option>
+                                <option value="8">8番ホール</option>
+                                <option value="9">9番ホール</option>
+                            </optgroup>
+                            <optgroup label="INコース">
+                                <option value="10">10番ホール</option>
+                                <option value="11">11番ホール</option>
+                                <option value="12">12番ホール</option>
+                                <option value="13">13番ホール</option>
+                                <option value="14">14番ホール</option>
+                                <option value="15">15番ホール</option>
+                                <option value="16">16番ホール</option>
+                                <option value="17">17番ホール</option>
+                                <option value="18">18番ホール</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="hole-info" id="current-hole-display">
+                        現在: <span id="course-display">OUT</span>コース <span id="hole-number-display">1</span>番ホール
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 名前設定セクション -->
+            <div class="name-setup">
+                <h3>プレーヤー名設定</h3>
+                <div class="name-input">
+                    <span class="color-box" style="background-color: #4CAF50;"></span>
+                    <label for="name-a">名前 A:</label>
+                    <input type="text" id="name-a" placeholder="名前を入力" value="Aさん">
+                </div>
+                
+                <div class="name-input">
+                    <span class="color-box" style="background-color: #2196F3;"></span>
+                    <label for="name-b">名前 B:</label>
+                    <input type="text" id="name-b" placeholder="名前を入力" value="Bさん">
+                </div>
+                
+                <div class="name-input">
+                    <span class="color-box" style="background-color: #F44336;"></span>
+                    <label for="name-c">名前 C:</label>
+                    <input type="text" id="name-c" placeholder="名前を入力" value="Cさん">
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button class="save-btn" onclick="updateNames()">名前を保存して適用</button>
+                <button class="utility-btn" onclick="resetNames()">デフォルトに戻す</button>
+                <button class="utility-btn" onclick="openTab('map-tab')">マップに戻る</button>
+            </div>
+            
+            <div id="settings-status" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+<script>
+// グローバル変数
+let map;
+let currentPerson = 'a';
+let locationData = {
+    a: [],
+    b: [],
+    c: []
+};
+let currentMarker;
+let isInSatelliteView = false; // 航空写真モードフラグ
+let cupInData = {
+    a: [], // 各ホールのカップイン記録（打数）を保存
+    b: [],
+    c: []
+};
+let cupPositions = []; // カップ位置を保存する配列
+let teePositions = []; // Tee位置を保存する配列
+let isSettingCupMode = false; // カップ設定モードかどうか
+let isSettingTeeMode = false; // Tee設定モードかどうか
+let currentHole = 1; // 現在選択中のホール番号（デフォルトは1番ホール）
+let shotLines = { a: null, b: null, c: null }; // 各プレイヤーのショットライン
+
+// カスタム名前
+let personNames = {
+    a: 'Aさん',
+    b: 'Bさん',
+    c: 'Cさん'
+};
+
+// タブ切り替え
+function openTab(tabName) {
+    // すべてのタブコンテンツを非表示
+    const tabContents = document.getElementsByClassName("tab-content");
+    for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].style.display = "none";
+    }
+    
+    // すべてのタブボタンからアクティブクラスを削除
+    const tabButtons = document.getElementsByClassName("tab-button");
+    for (let i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].className = tabButtons[i].className.replace(" active", "");
+    }
+    
+    // 選択されたタブを表示
+    document.getElementById(tabName).style.display = "block";
+    
+    // 選択されたタブボタンをアクティブにする
+    const activeButton = document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`);
+    if (activeButton) {
+        activeButton.className += " active";
+    }
+    
+    // マップタブに切り替わった時、マップを再描画
+    if (tabName === 'map-tab' && map) {
+        google.maps.event.trigger(map, 'resize');
+    }
+}
+
+// 名前更新
+function updateNames() {
+    personNames.a = document.getElementById('name-a').value || 'Aさん';
+    personNames.b = document.getElementById('name-b').value || 'Bさん';
+    personNames.c = document.getElementById('name-c').value || 'Cさん';
+    
+    // ボタンのテキスト更新
+    document.getElementById('btn-a').textContent = personNames.a;
+    document.getElementById('btn-b').textContent = personNames.b;
+    document.getElementById('btn-c').textContent = personNames.c;
+    
+    // 選択状態を再反映
+    selectPerson(currentPerson);
+    
+    // 位置リスト更新（名前が変わったため）
+    updateLocationList();
+    
+    // 設定を保存
+    saveSettings();
+    
+    // ステータス表示
+    showSettingsStatus('名前を更新しました', '#4CAF50');
+    
+    // 少し遅延してマップタブに戻る
+    setTimeout(() => {
+        openTab('map-tab');
+    }, 1500);
+}
+
+// 名前をリセット
+function resetNames() {
+    document.getElementById('name-a').value = 'Aさん';
+    document.getElementById('name-b').value = 'Bさん';
+    document.getElementById('name-c').value = 'Cさん';
+    
+    showSettingsStatus('名前をデフォルトに戻しました', '#2196F3');
+}
+
+// ホール番号の更新
+function updateCurrentHole() {
+    const holeSelect = document.getElementById('hole-select');
+    currentHole = parseInt(holeSelect.value);
+    
+    // 現在のホール表示を更新
+    const courseDisplay = document.getElementById('course-display');
+    const holeNumberDisplay = document.getElementById('hole-number-display');
+    
+    // OUTコース（1-9）またはINコース（10-18）を判定
+    if (currentHole <= 9) {
+        courseDisplay.textContent = 'OUT';
+    } else {
+        courseDisplay.textContent = 'IN';
+    }
+    
+    holeNumberDisplay.textContent = currentHole;
+    
+    // マップ上のホール表示も更新
+    updateHoleDisplay();
+    
+    // ステータス表示
+    showSettingsStatus(`ホール${currentHole}を選択しました`, '#2196F3');
+    
+    // 設定を保存
+    saveSettings();
+}
+
+// 設定の保存（ローカルストレージ使用）
+function saveSettings() {
+    try {
+        localStorage.setItem('personNames', JSON.stringify(personNames));
+        localStorage.setItem('currentHole', currentHole.toString());
+    } catch (e) {
+        console.error('設定の保存に失敗しました:', e);
+    }
+}
+
+// 設定の読み込み
+function loadSettings() {
+    try {
+        // 名前設定の読み込み
+        const savedNames = localStorage.getItem('personNames');
+        if (savedNames) {
+            personNames = JSON.parse(savedNames);
+            
+            // 入力フィールドを更新
+            document.getElementById('name-a').value = personNames.a;
+            document.getElementById('name-b').value = personNames.b;
+            document.getElementById('name-c').value = personNames.c;
+            
+            // ボタンテキスト更新
+            document.getElementById('btn-a').textContent = personNames.a;
+            document.getElementById('btn-b').textContent = personNames.b;
+            document.getElementById('btn-c').textContent = personNames.c;
+        }
+        
+        // ホール番号の読み込み
+        const savedHole = localStorage.getItem('currentHole');
+        if (savedHole) {
+            currentHole = parseInt(savedHole);
+            
+            // セレクトボックスを更新
+            if (document.getElementById('hole-select')) {
+                document.getElementById('hole-select').value = currentHole;
+                
+                // ホール表示も更新
+                const courseDisplay = document.getElementById('course-display');
+                const holeNumberDisplay = document.getElementById('hole-number-display');
+                
+                if (currentHole <= 9) {
+                    courseDisplay.textContent = 'OUT';
+                } else {
+                    courseDisplay.textContent = 'IN';
+                }
+                
+                holeNumberDisplay.textContent = currentHole;
+            }
+        }
+    } catch (e) {
+        console.error('設定の読み込みに失敗しました:', e);
+    }
+}
+
+// 設定タブのステータス表示
+function showSettingsStatus(message, color) {
+    const statusElement = document.getElementById('settings-status');
+    statusElement.textContent = message;
+    statusElement.style.backgroundColor = color ? color + '22' : '#f0f0f0'; // 半透明の背景色
+    statusElement.style.color = color ? color : '#333';
+    statusElement.style.padding = '10px';
+    statusElement.style.borderRadius = '4px';
+    statusElement.style.textAlign = 'center';
+    statusElement.style.borderLeft = `4px solid ${color || '#333'}`;
+    
+    // 一定時間後に背景色をフェードアウト
+    setTimeout(() => {
+        statusElement.style.transition = 'background-color 1s ease';
+        statusElement.style.backgroundColor = 'transparent';
+    }, 3000);
+}
+
+// カップ座標設定モードを切り替える
+function setCupMode() {
+    // 他のモードをリセット
+    isSettingTeeMode = false;
+    
+    isSettingCupMode = true;
+    document.querySelectorAll('.btn-group button').forEach(button => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = 'none';
+    });
+    
+    // カップ座標ボタンを強調表示
+    const cupModeBtn = document.querySelector('.btn-group button[onclick="setCupMode()"]');
+    cupModeBtn.style.transform = 'scale(1.1)';
+    cupModeBtn.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    
+    showStatus("カップ位置を設定するためにマップをタップしてください", "#9C27B0");
+}
+
+// Tee座標設定モードを切り替える
+function setTeeMode() {
+    // 他のモードをリセット
+    isSettingCupMode = false;
+    
+    isSettingTeeMode = true;
+    document.querySelectorAll('.btn-group button').forEach(button => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = 'none';
+    });
+    
+    // Tee座標ボタンを強調表示
+    const teeModeBtn = document.querySelector('.btn-group button[onclick="setTeeMode()"]');
+    teeModeBtn.style.transform = 'scale(1.1)';
+    teeModeBtn.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    
+    showStatus("Teeショット位置を設定するためにマップをタップしてください", "#795548");
+}
+
+// マップ初期化
+function initMap() {
+    try {
+        // 石坂ゴルフクラブの座標
+        const tokyo = { lat: 35.994686, lng: 139.365139 };
+        // マップの作成
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: tokyo,
+            zoom: 13,
+            mapTypeControl: true,
+            streetViewControl: true, // ストリートビューコントロールを有効化
+            fullscreenControl: true, // フルスクリーン表示を有効化
+            zoomControl: true,
+            scaleControl: true
+        });
+        // マップのクリックイベント
+        map.addListener("click", function(event) {
+            if (isSettingCupMode) {
+                addCupMarker(event.latLng);
+            } else if (isSettingTeeMode) {
+                addTeeMarker(event.latLng);
+            } else {
+                addLocationMarker(event.latLng);
+            }
+        });
+        
+        // ホール表示オーバーレイを作成
+        const holeDisplay = document.createElement('div');
+        holeDisplay.id = 'map-hole-display';
+        holeDisplay.className = 'hole-info';
+        holeDisplay.style.position = 'absolute';
+        holeDisplay.style.top = '10px';
+        holeDisplay.style.right = '10px';
+        holeDisplay.style.zIndex = '100';
+        holeDisplay.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+        holeDisplay.style.padding = '5px 10px';
+        holeDisplay.style.borderRadius = '4px';
+        holeDisplay.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+        holeDisplay.style.fontSize = '14px';
+        holeDisplay.style.fontWeight = 'bold';
+        
+        const mapContainer = document.getElementById('map');
+        mapContainer.appendChild(holeDisplay);
+        
+        // 現在のホール表示を更新
+        updateHoleDisplay();
+        
+        // 設定の読み込み
+        loadSettings();
+        
+        showStatus("マップの準備ができました", "#4CAF50");
+    } catch (err) {
+        console.error("マップ初期化エラー:", err);
+        showStatus("マップの読み込みに失敗しました: " + err.message, "#F44336");
+    }
+}
+
+// Tee位置のマーカーを追加
+function addTeeMarker(latLng) {
+    const lat = latLng.lat();
+    const lng = latLng.lng();
+    const timestamp = new Date();
+    const holeNumber = currentHole; // 現在選択中のホール番号を使用
+    
+    // 既存のTeeマーカーがあれば削除
+    let existingTeeMarker = null;
+    for (let i = 0; i < teePositions.length; i++) {
+        if (teePositions[i].holeNumber === holeNumber) {
+            existingTeeMarker = teePositions[i];
+            if (existingTeeMarker.marker) {
+                existingTeeMarker.marker.setMap(null);
+            }
+            teePositions.splice(i, 1);
+            break;
+        }
+    }
+    
+    // Teeマーカー作成
+    const marker = new google.maps.Marker({
+        position: latLng,
+        map: map,
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#795548", // 茶色
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+            scale: 10
+        },
+        title: `ホール${holeNumber}のTee`,
+        holeNumber: holeNumber // カスタムプロパティ
+    });
+    
+    // マーカークリックの処理
+    marker.addListener("click", function() {
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div style="text-align: center;">
+                    <strong>ホール${holeNumber}のTee位置</strong><br>
+                    緯度: ${lat.toFixed(6)}<br>
+                    経度: ${lng.toFixed(6)}<br>
+                    設定時刻: ${formatTime(timestamp)}<br>
+                </div>
+            `
+        });
+        infoWindow.open(map, marker);
+    });
+    
+    // Tee位置データを保存
+    teePositions.push({
+        holeNumber: holeNumber,
+        lat: lat,
+        lng: lng,
+        timestamp: timestamp,
+        marker: marker
+    });
+    
+    // モードをリセット
+    isSettingTeeMode = false;
+    
+    // ボタン表示をリセット
+    document.querySelectorAll('.btn-group button').forEach(button => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = 'none';
+    });
+    
+    // 人物選択を復活させる
+    selectPerson(currentPerson);
+    
+    // ステータス表示
+    showStatus(`ホール${holeNumber}のTee位置を設定しました`, "#795548");
+    
+    // 各プレイヤーの打球ラインを更新
+    updateShotLines();
+}
+
+// カップ位置のマーカーを追加
+function addCupMarker(latLng) {
+    const lat = latLng.lat();
+    const lng = latLng.lng();
+    const timestamp = new Date();
+    const holeNumber = currentHole; // 現在選択中のホール番号を使用
+    
+    // 既存のカップマーカーがあれば削除
+    let existingCupMarker = null;
+    for (let i = 0; i < cupPositions.length; i++) {
+        if (cupPositions[i].holeNumber === holeNumber) {
+            existingCupMarker = cupPositions[i];
+            if (existingCupMarker.marker) {
+                existingCupMarker.marker.setMap(null);
+            }
+            cupPositions.splice(i, 1);
+            break;
+        }
+    }
+    
+    // カップマーカー作成
+    const marker = new google.maps.Marker({
+        position: latLng,
+        map: map,
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#9C27B0", // 紫色
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+            scale: 10
+        },
+        title: `ホール${holeNumber}のカップ（クリックでカップイン記録）`,
+        holeNumber: holeNumber // カスタムプロパティ
+    });
+    
+    // マーカークリックの処理
+    marker.addListener("click", function() {
+        // カップ設定モードの場合は情報表示のみ
+        if (isSettingCupMode) {
+            const infoWindow = new google.maps.InfoWindow({
+                content: `
+                    <div style="text-align: center;">
+                        <strong>ホール${holeNumber}のカップ位置</strong><br>
+                        緯度: ${lat.toFixed(6)}<br>
+                        経度: ${lng.toFixed(6)}<br>
+                        設定時刻: ${formatTime(timestamp)}<br>
+                        <small>通常モードでクリックするとカップインを記録できます</small>
+                    </div>
+                `
+            });
+            infoWindow.open(map, marker);
+            return;
+        }
+        
+// 通常モード（人物選択中）の場合はカップイン記録
+        if (locationData[currentPerson].length > 0) {
+            // 確認ダイアログを表示
+            if (confirm(`${getPerson(currentPerson)}のカップインを記録しますか？`)) {
+                recordCupIn();
+                showStatus(`${getPerson(currentPerson)}のカップインを記録しました`, "#FF9800");
+            }
+        } else {
+            showStatus(`${getPerson(currentPerson)}の打球データがありません`, "#F44336");
+        }
+    });
+    
+    // カップ位置データを保存
+    cupPositions.push({
+        holeNumber: holeNumber,
+        lat: lat,
+        lng: lng,
+        timestamp: timestamp,
+        marker: marker
+    });
+    
+    // モードをリセット
+    isSettingCupMode = false;
+    
+    // ボタン表示をリセット
+    document.querySelectorAll('.btn-group button').forEach(button => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = 'none';
+    });
+    
+    // 人物選択を復活させる
+    selectPerson(currentPerson);
+    
+    // ステータス表示
+    showStatus(`ホール${holeNumber}のカップ位置を設定しました`, "#9C27B0");
+    
+    // 各プレイヤーの打球ラインを更新
+    updateShotLines();
+}
+
+// 現在のホール情報を更新
+function updateHoleDisplay() {
+    const mapHoleDisplay = document.getElementById('map-hole-display');
+    if (mapHoleDisplay) {
+        // OUTコース（1-9）またはINコース（10-18）を判定
+        const courseText = currentHole <= 9 ? 'OUT' : 'IN';
+        const courseColor = currentHole <= 9 ? '#2196F3' : '#4CAF50';
+        
+        mapHoleDisplay.innerHTML = `現在: <span style="color:${courseColor};">${courseText}コース ${currentHole}番ホール</span>`;
+    }
+    
+    // 各プレイヤーの打球ラインを更新
+    updateShotLines();
+}
+
+// 人物選択
+function selectPerson(person) {
+    currentPerson = person;
+    isSettingCupMode = false; // カップ設定モードをオフに
+    isSettingTeeMode = false; // Tee設定モードをオフに
+    
+    // ボタンの強調表示をリセット
+    document.querySelectorAll('.btn-group button').forEach(button => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = 'none';
+    });
+    
+    // 選択されたボタンを強調表示
+    const selectedClass = 'person-' + person;
+    document.querySelector('.' + selectedClass).style.transform = 'scale(1.1)';
+    document.querySelector('.' + selectedClass).style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    
+    // ホール情報も更新
+    updateHoleDisplay();
+    
+    showStatus(getPerson(person) + "を選択中", getPersonColor(person));
+}
+
+// 現在地へ移動
+function goToCurrentLocation() {
+    if (!navigator.geolocation) {
+        showStatus("位置情報が利用できません", "#F44336");
+        return;
+    }
+    showStatus("位置情報を取得中...", "#2196F3");
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const latLng = new google.maps.LatLng(lat, lng);
+            map.setCenter(latLng);
+            map.setZoom(15);
+            if (currentMarker) {
+                currentMarker.setPosition(latLng);
+            } else {
+                // 現在地マーカー（青い円）
+                currentMarker = new google.maps.Marker({
+                    position: latLng,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: "#2196F3",
+                        fillOpacity: 0.9,
+                        strokeColor: "#FFF",
+                        strokeWeight: 2,
+                        scale: 10
+                    },
+                    title: "現在地"
+                });
+            }
+            showStatus("現在地を表示しています", "#2196F3");
+        },
+        function(error) {
+            showStatus("位置情報の取得に失敗しました", "#F44336");
+            console.error("位置情報エラー:", error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+        }
+    );
+}
+
+// 位置マーカーを追加
+function addLocationMarker(latLng) {
+    const lat = latLng.lat();
+    const lng = latLng.lng();
+    const personData = locationData[currentPerson];
+    const markerNum = personData.length + 1;
+    const timestamp = new Date();
+    const markerColor = getPersonColor(currentPerson);
+    // マーカー作成（カスタムラベル付き）
+    const marker = new google.maps.Marker({
+        position: latLng,
+        map: map,
+        label: {
+            text: markerNum.toString(),
+            color: "white",
+            fontSize: "12px",
+            fontWeight: "bold"
+        },
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: markerColor,
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+            scale: 12
+        }
+    });
+    // 情報ウィンドウを作成
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div style="text-align: center;">
+                <strong>${getPerson(currentPerson)} #${markerNum}</strong><br>
+                緯度: ${lat.toFixed(6)}<br>
+                経度: ${lng.toFixed(6)}<br>
+                時刻: ${formatTime(timestamp)}
+            </div>
+        `
+    });
+    // マーカークリックで情報ウィンドウを表示
+    marker.addListener("click", function() {
+        infoWindow.open(map, marker);
+    });
+    // データ保存
+    personData.push({
+        marker: marker,
+        lat: lat,
+        lng: lng,
+        timestamp: timestamp,
+        num: markerNum
+    });
+    // テーブル更新
+    updateLocationList();
+    showStatus(`${getPerson(currentPerson)}の位置#${markerNum}を記録しました`, markerColor);
+    
+    // 打球ラインを更新
+    updateShotLines();
+}
+
+// 位置リスト更新
+function updateLocationList() {
+    const tableBody = document.getElementById('location-list');
+    tableBody.innerHTML = '';
+    
+    // 全データを収集するための配列
+    let allLocationsData = [];
+    
+    // 現在進行中の各プレーヤーのデータを収集
+    for (const person of ['a', 'b', 'c']) {
+        // 現在のホール番号を使用
+        const holeNumber = currentHole;
+        
+        locationData[person].forEach(location => {
+            allLocationsData.push({
+                type: 'shot',
+                person: person,
+                location: location,
+                holeNumber: holeNumber,
+                timestamp: location.timestamp
+            });
+        });
+    }
+    
+    // 完了したホールのデータも収集
+    for (const person of ['a', 'b', 'c']) {
+        // この人の完了したホールのデータ
+        const completedHoles = cupInData[person];
+        
+        completedHoles.forEach(hole => {
+            // カップイン情報を追加
+            allLocationsData.push({
+                type: 'cupin',
+                person: person,
+                holeNumber: hole.holeNumber,
+                strokeCount: hole.strokeCount,
+                lat: hole.lat,
+                lng: hole.lng,
+                timestamp: hole.timestamp
+            });
+            
+            // 各ホールのすべての打球データがあれば追加
+            if (hole.shots) {
+                hole.shots.forEach(shot => {
+                    allLocationsData.push({
+                        type: 'past_shot',
+                        person: person,
+                        location: shot,
+                        holeNumber: hole.holeNumber,
+                        timestamp: shot.timestamp
+                    });
+                });
+            }
+        });
+    }
+    
+    // カップ位置データも追加
+    cupPositions.forEach(cup => {
+        allLocationsData.push({
+            type: 'cup_position',
+            holeNumber: cup.holeNumber,
+            lat: cup.lat,
+            lng: cup.lng,
+            timestamp: cup.timestamp
+        });
+    });
+    
+    // Tee位置データも追加
+    teePositions.forEach(tee => {
+        allLocationsData.push({
+            type: 'tee_position',
+            holeNumber: tee.holeNumber,
+            lat: tee.lat,
+            lng: tee.lng,
+            timestamp: tee.timestamp
+        });
+    });
+    
+    // 時間でソート（新しい順）
+    allLocationsData.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // テーブルに追加
+    allLocationsData.forEach(data => {
+        const row = document.createElement('tr');
+        
+        // データタイプに応じて行の内容を設定
+        if (data.type === 'shot' || data.type === 'past_shot') {
+            // 打球データの行
+            
+            // 名前セル
+            const nameCell = document.createElement('td');
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = getPerson(data.person);
+            nameSpan.style.color = getPersonColor(data.person);
+            nameSpan.style.fontWeight = 'bold';
+            nameCell.appendChild(nameSpan);
+            row.appendChild(nameCell);
+            
+            // 番号セル
+            const numCell = document.createElement('td');
+            numCell.textContent = data.location.num;
+            if (data.type === 'past_shot') {
+                numCell.style.color = '#888'; // 過去の打球は薄い色にする
+            }
+            row.appendChild(numCell);
+            
+            // 緯度セル
+            const latCell = document.createElement('td');
+            latCell.textContent = data.location.lat.toFixed(6);
+            row.appendChild(latCell);
+            
+            // 経度セル
+            const lngCell = document.createElement('td');
+            lngCell.textContent = data.location.lng.toFixed(6);
+            row.appendChild(lngCell);
+            
+            // 時刻セル
+            const timeCell = document.createElement('td');
+            timeCell.textContent = formatTime(data.location.timestamp);
+            row.appendChild(timeCell);
+            
+            // 打数セル
+            const strokeCell = document.createElement('td');
+            if (data.type === 'past_shot') {
+                strokeCell.textContent = `ホール${data.holeNumber}: ${data.location.num}/${cupInData[data.person][data.holeNumber-1].strokeCount}打`;
+                strokeCell.style.color = '#888';
+            } else {
+                strokeCell.textContent = `ホール${data.holeNumber}: ${data.location.num}打目`;
+            }
+            row.appendChild(strokeCell);
+            
+        } else if (data.type === 'cupin') {
+            // カップイン行
+            
+            // 名前セル
+            const nameCell = document.createElement('td');
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = getPerson(data.person);
+            nameSpan.style.color = getPersonColor(data.person);
+            nameSpan.style.fontWeight = 'bold';
+            nameCell.appendChild(nameSpan);
+            row.appendChild(nameCell);
+            
+            // 番号セル
+            const numCell = document.createElement('td');
+            numCell.textContent = "カップイン";
+            numCell.style.fontWeight = "bold";
+            numCell.style.color = "#FF9800";
+            row.appendChild(numCell);
+            
+            // 緯度セル
+            const latCell = document.createElement('td');
+            latCell.textContent = data.lat ? data.lat.toFixed(6) : "-";
+            row.appendChild(latCell);
+            
+            // 経度セル
+            const lngCell = document.createElement('td');
+            lngCell.textContent = data.lng ? data.lng.toFixed(6) : "-";
+            row.appendChild(lngCell);
+            
+            // 時刻セル
+            const timeCell = document.createElement('td');
+            timeCell.textContent = formatTime(data.timestamp);
+            row.appendChild(timeCell);
+            
+            // 打数セル
+            const strokeCell = document.createElement('td');
+            strokeCell.textContent = `ホール${data.holeNumber}: ${data.strokeCount}打`;
+            strokeCell.style.fontWeight = "bold";
+            strokeCell.style.color = "#FF9800";
+            row.appendChild(strokeCell);
+            
+        } else if (data.type === 'cup_position') {
+            // カップ位置の行
+            
+            // 名前セル
+            const nameCell = document.createElement('td');
+            nameCell.textContent = "カップ位置";
+            nameCell.style.fontWeight = "bold";
+            nameCell.style.color = "#9C27B0";
+            row.appendChild(nameCell);
+            
+            // 番号セル
+            const numCell = document.createElement('td');
+            numCell.textContent = `ホール${data.holeNumber}`;
+            numCell.style.fontWeight = "bold";
+            numCell.style.color = "#9C27B0";
+            row.appendChild(numCell);
+            
+            // 緯度セル
+            const latCell = document.createElement('td');
+            latCell.textContent = data.lat.toFixed(6);
+            row.appendChild(latCell);
+            
+            // 経度セル
+            const lngCell = document.createElement('td');
+            lngCell.textContent = data.lng.toFixed(6);
+            row.appendChild(lngCell);
+            
+            // 時刻セル
+            const timeCell = document.createElement('td');
+            timeCell.textContent = formatTime(data.timestamp);
+            row.appendChild(timeCell);
+            
+            // 打数セル
+            const strokeCell = document.createElement('td');
+            strokeCell.textContent = `-`;
+            row.appendChild(strokeCell);
+            
+        } else if (data.type === 'tee_position') {
+            // Tee位置の行
+            
+            // 名前セル
+            const nameCell = document.createElement('td');
+            nameCell.textContent = "Tee位置";
+            nameCell.style.fontWeight = "bold";
+            nameCell.style.color = "#795548";
+            row.appendChild(nameCell);
+            
+            // 番号セル
+            const numCell = document.createElement('td');
+            numCell.textContent = `ホール${data.holeNumber}`;
+            numCell.style.fontWeight = "bold";
+            numCell.style.color = "#795548";
+            row.appendChild(numCell);
+            
+            // 緯度セル
+            const latCell = document.createElement('td');
+            latCell.textContent = data.lat.toFixed(6);
+            row.appendChild(latCell);
+            
+            // 経度セル
+            const lngCell = document.createElement('td');
+            lngCell.textContent = data.lng.toFixed(6);
+            row.appendChild(lngCell);
+            
+            // 時刻セル
+            const timeCell = document.createElement('td');
+            timeCell.textContent = formatTime(data.timestamp);
+            row.appendChild(timeCell);
+            
+            // 打数セル
+            const strokeCell = document.createElement('td');
+            strokeCell.textContent = `-`;
+            row.appendChild(strokeCell);
+        }
+        
+        tableBody.appendChild(row);
+    });
+}
+
+// マーカー全削除
+function clearMarkers() {
+    // 確認ダイアログ
+    if (!confirm('全ての位置データとカップイン記録を削除します。よろしいですか？')) {
+        return;
+    }
+    
+    // 各人物のマーカーを削除
+    for (const person in locationData) {
+        locationData[person].forEach(item => {
+            if (item.marker) {
+                item.marker.setMap(null);
+            }
+        });
+        locationData[person] = [];
+    }
+    
+    // カップインデータの記録もクリア（含まれるマーカーも削除）
+    for (const person in cupInData) {
+        cupInData[person].forEach(hole => {
+            // ホールの各ショットのマーカーも削除（shots配列があれば）
+            if (hole.shots) {
+                hole.shots.forEach(shot => {
+                    if (shot.marker) {
+                        shot.marker.setMap(null);
+                    }
+                });
+            }
+        });
+        cupInData[person] = [];
+    }
+    
+    // カップ位置マーカーの削除
+    cupPositions.forEach(cup => {
+        if (cup.marker) {
+            cup.marker.setMap(null);
+        }
+    });
+    cupPositions = [];
+    
+    // Tee位置マーカーの削除
+    teePositions.forEach(tee => {
+        if (tee.marker) {
+            tee.marker.setMap(null);
+        }
+    });
+    teePositions = [];
+    
+    // 現在地マーカーも削除
+    if (currentMarker) {
+        currentMarker.setMap(null);
+        currentMarker = null;
+    }
+    
+    // 打球ラインの削除
+    for (const person in shotLines) {
+        if (shotLines[person]) {
+            shotLines[person].setMap(null);
+            shotLines[person] = null;
+        }
+    }
+    
+    // テーブル更新
+    updateLocationList();
+    showStatus('全ての位置データとカップイン記録を削除しました', '#555');
+}
+
+// カップイン記録
+function recordCupIn() {
+    const personData = locationData[currentPerson];
+    
+    // 位置記録がない場合はエラー
+    if (personData.length === 0) {
+        showStatus(`${getPerson(currentPerson)}の位置記録がありません`, '#F44336');
+        return;
+    }
+    
+    // 現在のホール番号を取得（設定画面で選択したもの）
+    const holeNumber = currentHole;
+    
+    // カップイン時には最後の打数の後に+1打を加える（要件１）
+    const strokeCount = personData.length + 1;
+    
+    // 最後の打球位置を取得
+    const lastLat = personData[personData.length-1].lat;
+    const lastLng = personData[personData.length-1].lng;
+    const timestamp = new Date();
+    
+    // このホールのショットデータを深いコピーで作成
+    const currentShots = JSON.parse(JSON.stringify(
+        personData.map(item => ({
+            num: item.num,
+            lat: item.lat,
+            lng: item.lng,
+            timestamp: new Date(item.timestamp)
+        }))
+    ));
+    
+    // カップインデータを記録
+    cupInData[currentPerson].push({
+        holeNumber: holeNumber,
+        strokeCount: strokeCount,  // +1 された打数で記録
+        timestamp: timestamp,
+        lat: lastLat,
+        lng: lastLng,
+        shots: currentShots
+    });
+    
+    // 最後のマーカーをカップインマーカーに変更
+    const lastMarker = personData[personData.length - 1].marker;
+    
+    // マーカーの見た目を変更（黄色い星マークなど）
+    lastMarker.setIcon({
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: "#FFD700", // 金色
+        fillOpacity: 1,
+        strokeColor: "#FF9800",
+        strokeWeight: 3,
+        scale: 15
+    });
+    
+    // ステータス表示
+    showStatus(`${getPerson(currentPerson)}のホール${holeNumber}が${strokeCount}打でカップインしました`, '#FF9800');
+    
+    // 情報ウィンドウを更新
+    const infoContent = `
+        <div style="text-align: center;">
+            <strong>${getPerson(currentPerson)} #${personData.length}</strong><br>
+            <span style="color: #FF9800; font-weight: bold;">ホール${holeNumber}: ${strokeCount}打でカップイン</span><br>
+            <small>(最後の打球 + カップインの1打)</small><br>
+            緯度: ${lastLat.toFixed(6)}<br>
+            経度: ${lastLng.toFixed(6)}<br>
+            時刻: ${formatTime(timestamp)}
+        </div>
+    `;
+    
+    const infoWindow = new google.maps.InfoWindow({
+        content: infoContent
+    });
+    
+    infoWindow.open(map, lastMarker);
+    
+    // テーブル更新（カップイン情報を含める）
+    updateLocationList();
+    
+    // 打球ラインを更新
+    updateShotLines();
+    
+    // 現在のホールの打球データをクリア（すでにカップインしたため）
+    locationData[currentPerson] = [];
+}
+
+// CSVエクスポート
+function exportCSV() {
+    // 全データを収集するための配列
+    let allData = [];
+    
+    // 現在進行中の各プレーヤーのデータを収集
+    for (const person of ['a', 'b', 'c']) {
+        // 現在のホール番号を使用
+        const holeNumber = currentHole;
+        
+        locationData[person].forEach(item => {
+            allData.push({
+                type: 'shot',
+                name: getPerson(person),
+                num: item.num,
+                lat: item.lat,
+                lng: item.lng,
+                timestamp: item.timestamp,
+                hole: holeNumber,
+                strokeInfo: `ホール${holeNumber}: ${item.num}打目`
+            });
+        });
+    }
+    
+    // 完了したホールのデータ（カップインとすべての打球）を追加
+    for (const person of ['a', 'b', 'c']) {
+        // この人の完了したホールのデータ
+        cupInData[person].forEach(hole => {
+            // カップイン情報
+            allData.push({
+                type: 'cupin',
+                name: getPerson(person),
+                num: 'カップイン',
+                lat: hole.lat || 0,
+                lng: hole.lng || 0,
+                timestamp: hole.timestamp,
+                hole: hole.holeNumber,
+                strokeInfo: `ホール${hole.holeNumber}: ${hole.strokeCount}打`
+            });
+            
+            // 各ホールの打球データがあれば追加
+            if (hole.shots) {
+                hole.shots.forEach(shot => {
+                    allData.push({
+                        type: 'past_shot',
+                        name: getPerson(person),
+                        num: shot.num,
+                        lat: shot.lat,
+                        lng: shot.lng,
+                        timestamp: shot.timestamp,
+                        hole: hole.holeNumber,
+                        strokeInfo: `ホール${hole.holeNumber}: ${shot.num}/${hole.strokeCount}打`
+                    });
+                });
+            }
+        });
+    }
+    
+    // カップ位置データも追加
+    cupPositions.forEach(cup => {
+        allData.push({
+            type: 'cup_position',
+            name: 'カップ位置',
+            num: cup.holeNumber,
+            lat: cup.lat,
+            lng: cup.lng,
+            timestamp: cup.timestamp,
+            hole: cup.holeNumber,
+            strokeInfo: `ホール${cup.holeNumber}のカップ位置`
+        });
+    });
+    
+    // Tee位置データも追加
+    teePositions.forEach(tee => {
+        allData.push({
+            type: 'tee_position',
+            name: 'Tee位置',
+            num: tee.holeNumber,
+            lat: tee.lat,
+            lng: tee.lng,
+            timestamp: tee.timestamp,
+            hole: tee.holeNumber,
+            strokeInfo: `ホール${tee.holeNumber}のTee位置`
+        });
+    });
+    
+    // 空配列チェック
+    if (allData.length === 0) {
+        showStatus('エクスポートするデータがありません', '#F44336');
+        return;
+    }
+    
+    // 時間順にソート
+    allData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // CSVデータ作成
+    let csvContent = "名前,タイプ,番号,緯度,経度,時刻,ホール,打数情報\n";
+    
+    allData.forEach(item => {
+        let typeText = "";
+        switch(item.type) {
+            case 'shot': typeText = "打球"; break;
+            case 'past_shot': typeText = "過去の打球"; break;
+            case 'cupin': typeText = "カップイン"; break;
+            case 'cup_position': typeText = "カップ位置"; break;
+            case 'tee_position': typeText = "Tee位置"; break;
+            default: typeText = item.type;
+        }
+        
+        csvContent += `${item.name},${typeText},${item.num},${item.lat.toFixed(6)},${item.lng.toFixed(6)},`;
+        csvContent += `${formatTime(item.timestamp)},${item.hole},${item.strokeInfo}\n`;
+    });
+    
+    try {
+        // ダウンロード処理
+        const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', '位置データ.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showStatus('CSVファイルをダウンロードしました', '#4CAF50');
+    } catch (error) {
+        console.error('CSVエクスポートエラー:', error);
+        showStatus('CSVエクスポートに失敗しました: ' + error.message, '#F44336');
+    }
+}
+
+// ユーティリティ関数
+function getPerson(person) {
+    return personNames[person];
+}
+
+function getPersonColor(person) {
+    return person === 'a' ? '#4CAF50' : person === 'b' ? '#2196F3' : '#F44336';
+}
+
+function formatTime(date) {
+    return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+function showStatus(message, color) {
+    const statusElement = document.getElementById('status');
+    statusElement.textContent = message;
+    statusElement.style.backgroundColor = color ? color + '22' : '#f0f0f0'; // 半透明の背景色
+    statusElement.style.color = color ? color : '#333';
+    statusElement.style.borderLeft = `4px solid ${color || '#333'}`;
+    // 一定時間後に背景色をフェードアウト
+    setTimeout(() => {
+        statusElement.style.transition = 'background-color 1s ease';
+        statusElement.style.backgroundColor = 'transparent';
+    }, 3000);
+}
+
+// 航空写真表示の切り替え
+function toggleSatelliteView() {
+    isInSatelliteView = !isInSatelliteView;
+    if (isInSatelliteView) {
+        map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+        showStatus("航空写真表示に切り替えました", "#555");
+    } else {
+        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+        showStatus("地図表示に切り替えました", "#555");
+    }
+}
+
+// 拡大表示
+function zoomInView() {
+    const currentZoom = map.getZoom();
+    const newZoom = Math.min(currentZoom + 2, 20); // 最大ズームレベル20
+    map.setZoom(newZoom);
+    showStatus(`拡大表示: ズームレベル ${newZoom}`, "#555");
+}
+
+// マップビューをリセット
+function resetMapView() {
+    // 標準マップに戻す
+    map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+    isInSatelliteView = false;
+    
+    // ズームレベルを元に戻す
+    map.setZoom(13);
+    
+    // 石坂ゴルフクラブの座標に戻す
+    map.setCenter({ lat: 35.994686, lng: 139.365139 });
+    
+    showStatus("マップを標準表示に戻しました", "#555");
+}
+
+// 打球ラインを更新する関数
+function updateShotLines() {
+    // 現在のホール番号
+    const holeNumber = currentHole;
+    
+    // まず既存のラインを削除
+    for (const person in shotLines) {
+        if (shotLines[person]) {
+            shotLines[person].setMap(null);
+            shotLines[person] = null;
+        }
+    }
+    
+    // 各プレイヤーについて処理
+    for (const person of ['a', 'b', 'c']) {
+        const personColor = getPersonColor(person);
+        const currentShots = locationData[person];
+        
+        // プレイヤーのデータがない場合は、過去のホールのデータを探す
+        if (currentShots.length === 0) {
+            // 過去のデータから現在のホールのデータを探す
+            const completedHoleData = cupInData[person].find(hole => hole.holeNumber === holeNumber);
+            
+            if (completedHoleData && completedHoleData.shots && completedHoleData.shots.length > 0) {
+                // ショットの位置を収集
+                const path = [];
+                
+                // Tee位置があれば追加
+                const teePosition = teePositions.find(tee => tee.holeNumber === holeNumber);
+                if (teePosition) {
+                    path.push({ lat: teePosition.lat, lng: teePosition.lng });
+                }
+                
+                // ショットを順番に追加 (カップインした場合はカップも含める)
+                completedHoleData.shots.forEach(shot => {
+                    path.push({ lat: shot.lat, lng: shot.lng });
+                });
+                
+                // カップインしたホールならカップ位置も追加
+                const cupPosition = cupPositions.find(cup => cup.holeNumber === holeNumber);
+                if (cupPosition) {
+                    path.push({ lat: cupPosition.lat, lng: cupPosition.lng });
+                }
+                
+                // 2点以上あればラインを描画
+                if (path.length >= 2) {
+                    shotLines[person] = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: personColor,
+                        strokeOpacity: 0.8,
+                        strokeWeight: 3
+                    });
+                    
+                    shotLines[person].setMap(map);
+                }
+            }
+        } else {
+            // 現在進行中のショットがある場合
+            // ショットの位置を収集
+            const path = [];
+            
+            // Tee位置があれば追加
+            const teePosition = teePositions.find(tee => tee.holeNumber === holeNumber);
+            if (teePosition) {
+                path.push({ lat: teePosition.lat, lng: teePosition.lng });
+            }
+            
+            // ショットを順番に追加
+            currentShots.forEach(shot => {
+                path.push({ lat: shot.lat, lng: shot.lng });
+            });
+            
+            // カップは追加しない（カップインしていないため）
+            
+            // 2点以上あればラインを描画
+            if (path.length >= 2) {
+                shotLines[person] = new google.maps.Polyline({
+                    path: path,
+                    geodesic: true,
+                    strokeColor: personColor,
+                    strokeOpacity: 0.8,
+                    strokeWeight: 3
+                });
+                
+                shotLines[person].setMap(map);
+            }
+        }
+    }
+}
+
+// 初期化
+// マップタブに現在のホール表示を追加
+document.addEventListener('DOMContentLoaded', function() {
+    // 現在のホール表示用のコンテナを作成
+    const holeDisplay = document.createElement('div');
+    holeDisplay.id = 'map-hole-display';
+    holeDisplay.className = 'hole-info';
+    holeDisplay.style.position = 'absolute';
+    holeDisplay.style.top = '10px';
+    holeDisplay.style.right = '10px';
+    holeDisplay.style.zIndex = '100';
+    holeDisplay.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+    holeDisplay.style.padding = '5px 10px';
+    holeDisplay.style.borderRadius = '4px';
+    holeDisplay.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    holeDisplay.style.fontSize = '14px';
+    
+    // マップコンテナに追加
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.style.position = 'relative';
+        mapContainer.appendChild(holeDisplay);
+    }
+    
+    // 設定の読み込み
+    loadSettings();
+});
+</script>
+<!-- Google Maps JavaScript API -->
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?callback=initMap">
+</script>
+</body>
+</html>
